@@ -52,7 +52,7 @@ Store.prototype.writeCandles = function() {
   if(_.isEmpty(this.cache))
     return;
 
-  const transaction = () => {
+  var transaction = function() {
     this.db.run("BEGIN TRANSACTION");
 
     var stmt = this.db.prepare(`
@@ -81,13 +81,11 @@ Store.prototype.writeCandles = function() {
 
     stmt.finalize();
     this.db.run("COMMIT");
-    // TEMP: should fix https://forum.gekko.wizb.it/thread-57279-post-59194.html#pid59194
-    this.db.run("pragma wal_checkpoint;");
     
     this.cache = [];
   }
 
-  this.db.serialize(transaction);
+  this.db.serialize(_.bind(transaction, this));
 }
 
 var processCandle = function(candle, done) {

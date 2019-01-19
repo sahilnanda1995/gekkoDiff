@@ -1,7 +1,5 @@
 var _ = require('lodash');
-const log = require('../../core/log');
-const util = require('../../core/util');
-const config = util.getConfig();
+var config = require('../../core/util.js').getConfig();
 
 var handle = require('./handle');
 var postgresUtil = require('./util');
@@ -9,9 +7,34 @@ var postgresUtil = require('./util');
 var Store = function(done, pluginMeta) {
   _.bindAll(this);
   this.done = done;
+
   this.db = handle;
+  this.upsertTables();
+
   this.cache = [];
-  done();
+}
+
+Store.prototype.upsertTables = function() {
+  var createQueries = [
+    `CREATE TABLE IF NOT EXISTS
+    ${postgresUtil.table('candles')} (
+      id BIGSERIAL PRIMARY KEY,
+      start integer UNIQUE,
+      open double precision NOT NULL,
+      high double precision NOT NULL,
+      low double precision NOT NULL,
+      close double precision NOT NULL,
+      vwp double precision NOT NULL,
+      volume double precision NOT NULL,
+      trades INTEGER NOT NULL
+    );`
+  ];
+
+  var next = _.after(_.size(createQueries), this.done);
+
+  _.each(createQueries, function(q) {
+    this.db.query(q,next);
+  }, this);
 }
 
 Store.prototype.writeCandles = function() {
@@ -19,33 +42,24 @@ Store.prototype.writeCandles = function() {
     return;
   }
 
-  //log.debug('Writing candles to DB!');
-  _.each(this.cache, candle => {
-    var stmt =  `
-    BEGIN; 
-    LOCK TABLE ${postgresUtil.table('candles')} IN SHARE ROW EXCLUSIVE MODE; 
-    INSERT INTO ${postgresUtil.table('candles')} 
-    (start, open, high,low, close, vwp, volume, trades) 
-    VALUES 
-    (${candle.start.unix()}, ${candle.open}, ${candle.high}, ${candle.low}, ${candle.close}, ${candle.vwp}, ${candle.volume}, ${candle.trades}) 
-    ON CONFLICT ON CONSTRAINT ${postgresUtil.startconstraint('candles')} 
-    DO NOTHING; 
-    COMMIT; 
-    `;
+  var stmt = `
+  INSERT INTO ${postgresUtil.table('candles')}
+  (start, open, high,low, close, vwp, volume, trades)
+  select $1, $2, $3, $4, $5, $6, $7, $8
+  WHERE NOT EXISTS (select id from ${postgresUtil.table('candles')} where start=$1);
+  `;
 
-    this.db.connect((err,client,done) => {
-      if(err) {
-        util.die(err);
-      }
-      client.query(stmt, (err, res) => {
-        done();
-        if (err) {
-          log.debug(err.stack)
-        } else {
-          //log.debug(res)
-        }
-      });
-    });
+  _.each(this.cache, candle => {
+    this.db.query(stmt,[
+      candle.start.unix(),
+      candle.open,
+      candle.high,
+      candle.low,
+      candle.close,
+      candle.vwp,
+      candle.volume,
+      candle.trades
+    ]);
   });
 
   this.cache = [];
@@ -53,7 +67,7 @@ Store.prototype.writeCandles = function() {
 
 var processCandle = function(candle, done) {
   this.cache.push(candle);
-  if (this.cache.length > 1)
+  if (this.cache.length > 1) 
     this.writeCandles();
 
   done();

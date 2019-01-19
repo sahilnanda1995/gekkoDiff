@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
 div
   .mx1
     label(for='exchange').wrapper Exchange:

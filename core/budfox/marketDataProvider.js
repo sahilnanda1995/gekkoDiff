@@ -10,6 +10,7 @@ const util = require(__dirname + '/../util');
 
 const MarketFetcher = require('./marketFetcher');
 const dirs = util.dirs();
+const cp = require(dirs.core + 'cp');
 
 const Manager = function(config) {
 
@@ -32,14 +33,14 @@ Manager.prototype.retrieve = function() {
 
 
 Manager.prototype.relayTrades = function(batch) {
-  this.sendMarketStart(batch);
-  this.emit('marketUpdate', batch.last.date);
-
   this.emit('trades', batch);
+
+  this.sendStartAt(batch);
+  cp.update(batch.last.date.format());
 }
 
-Manager.prototype.sendMarketStart = _.once(function(batch) {
-  this.emit('marketStart', batch.first.date);
+Manager.prototype.sendStartAt = _.once(function(batch) {
+  cp.startAt(batch.first.date.format())
 });
 
 module.exports = Manager;

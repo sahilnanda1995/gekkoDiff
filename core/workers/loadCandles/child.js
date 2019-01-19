@@ -22,7 +22,3 @@ process.on('message', (m) => {
   if(m.what === 'start')
     start(m.config, m.candleSize, m.daterange);
 });
-
-process.on('disconnect', function() {
-  process.exit(0);
-})

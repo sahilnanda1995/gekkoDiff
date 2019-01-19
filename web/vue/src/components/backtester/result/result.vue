@@ -1,11 +1,11 @@
-<template lang='pug'>
+<template lang='jade'>
   div
     .hr.contain
     div.contain
       h3 Backtest result
-    result-summary(:report='result.performanceReport')
+    result-summary(:report='result.report')
     .hr.contain
-    chart(:data='candles', height='500')
+    chart(:data='result', height='500')
     .hr.contain
     roundtripTable(:roundtrips='result.roundtrips')
 </template>
@@ -25,14 +25,6 @@ export default {
     roundtripTable,
     resultSummary,
     chart
-  },
-  computed: {
-    candles: function() {
-      return {
-        candles: this.result.stratCandles,
-        trades: this.result.trades
-      };
-    }
   }
 }
 </script>

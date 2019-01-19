@@ -56,9 +56,7 @@ module.exports = (config, callback) => {
 
     // else we are done and have candles!
     done(null, m);
-    if (this.connected) {
-      this.disconnect();
-    }
+    child.kill('SIGINT');
   });
 
   child.on('exit', code => {

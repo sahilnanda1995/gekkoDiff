@@ -1,4 +1,4 @@
-var UIconfig = require('../vue/dist/UIconfig');
+var UIconfig = require('../vue/UIconfig');
 
 var config = {};
 
@@ -19,20 +19,13 @@ config.tradingAdvisor = {
 config.candleWriter = {
   enabled: false
 }
-
-config.backtestResultExporter = {
+config.adviceWriter = {
   enabled: false,
-  writeToDisk: false,
-  data: {
-    stratUpdates: false,
-    roundtrips: true,
-    stratCandles: true,
-    trades: true
-  }
+  muteSoft: true,
 }
 
-config.childToParent = {
-  enabled: false,
+config.trader = {
+  orderUpdateDelay: 1 // Number of minutes to adjust unfilled order prices
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,7 +55,7 @@ config.postgresql = {
   schema: 'public',
   dependencies: [{
     module: 'pg',
-    version: '7.4.3'
+    version: '6.1.0'
   }]
 }
 
@@ -75,11 +68,6 @@ config.mongodb = {
     module: 'mongojs',
     version: '2.4.0'
   }]
-}
-
-config.adviceWriter = {
-  enabled: false,
-  muteSoft: true,
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

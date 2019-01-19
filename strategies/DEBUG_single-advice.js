@@ -1,7 +1,6 @@
 var settings = {
   wait: 0,
-  // advice: 'short'
-  advice: 'long'
+  advice: 'short'
 };
 
 // -------
@@ -17,17 +16,9 @@ var method = {
   log: _.noop,
   check: function() {
 
-    // log.info('iteration:', i);
-    if(settings.wait === i) {
-      console.log('trigger advice!');
-      this.advice({
-        direction: settings.advice,
-        trigger: {
-          type: 'trailingStop',
-          trailPercentage: 0.5
-        }
-      });
-    }
+    log.info('iteration:', i);
+    if(settings.wait === i)
+      this.advice(settings.advice);
 
     i++
 

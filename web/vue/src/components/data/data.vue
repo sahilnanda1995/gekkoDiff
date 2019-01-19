@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
   .contain
     .text(v-html='intro')
     .hr

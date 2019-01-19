@@ -1,4 +1,4 @@
-// log trade performance results
+// log paper trade results using the logger
 
 const _ = require('lodash');
 const moment = require('moment');
@@ -7,6 +7,8 @@ const humanizeDuration = require('humanize-duration');
 const util = require('../../core/util.js');
 const dirs = util.dirs();
 const mode = util.gekkoMode();
+const config = util.getConfig();
+const calcConfig = config.paperTrader;
 const log = require(dirs.core + 'log');
 
 const Logger = function(watchConfig) {
@@ -20,6 +22,10 @@ Logger.prototype.round = function(amount) {
   return amount.toFixed(8);
 }
 
+Logger.prototype.handleStartBalance = function() {
+  // noop
+}
+
 // used for:
 // - realtime logging (per advice)
 // - backtest logging (on finalize)
@@ -29,10 +35,10 @@ Logger.prototype.logReport = function(trade, report) {
   var start = this.round(report.startBalance);
   var current = this.round(report.balance);
 
-  log.info(`(PROFIT REPORT) original balance:\t\t ${start} ${this.currency}`);
-  log.info(`(PROFIT REPORT) current balance:\t\t ${current} ${this.currency}`);
+  log.info(`(PROFIT REPORT) original simulated balance:\t ${start} ${this.currency}`);
+  log.info(`(PROFIT REPORT) current simulated balance:\t ${current} ${this.currency}`);
   log.info(
-    `(PROFIT REPORT) profit:\t\t\t\t ${this.round(report.profit)} ${this.currency}`,
+    `(PROFIT REPORT) simulated profit:\t\t ${this.round(report.profit)} ${this.currency}`,
     `(${this.round(report.relativeProfit)}%)`
   );
 }
@@ -45,13 +51,15 @@ Logger.prototype.logRoundtrip = function(rt) {
   const display = [
     rt.entryAt.utc().format('YYYY-MM-DD HH:mm'),
     rt.exitAt.utc().format('YYYY-MM-DD HH:mm'),
-    (moment.duration(rt.duration).humanize() + "           ").slice(0, 16),
+    (moment.duration(rt.duration).humanize() + "           ").slice(0,16),
     rt.pnl.toFixed(2),
     rt.profit.toFixed(2)
   ];
 
   log.info('(ROUNDTRIP)', display.join('\t'));
 }
+
+
 
 if(mode === 'backtest') {
   // we only want to log a summarized one line report, like:
@@ -94,7 +102,8 @@ if(mode === 'backtest') {
     log.info(`(PROFIT REPORT) start time:\t\t\t ${report.startTime}`);
     log.info(`(PROFIT REPORT) end time:\t\t\t ${report.endTime}`);
     log.info(`(PROFIT REPORT) timespan:\t\t\t ${report.timespan}`);
-    log.info(`(PROFIT REPORT) exposure:\t\t\t ${report.exposure}`);
+    if(report.sharpe)
+      log.info(`(PROFIT REPORT) sharpe ratio:\t\t\t ${report.sharpe}`);
     log.info();
     log.info(`(PROFIT REPORT) start price:\t\t\t ${report.startPrice} ${this.currency}`);
     log.info(`(PROFIT REPORT) end price:\t\t\t ${report.endPrice} ${this.currency}`);
@@ -108,10 +117,6 @@ if(mode === 'backtest') {
       `(PROFIT REPORT) simulated yearly profit:\t ${report.yearlyProfit}`,
       `${this.currency} (${report.relativeYearlyProfit}%)`
     );
-
-    log.info(`(PROFIT REPORT) sharpe ratio:\t\t\t ${report.sharpe}`);
-    log.info(`(PROFIT REPORT) expected downside:\t\t ${report.downside}`);
-    log.info(`(PROFIT REPORT) ratio roundtrips:\t\t ${report.ratioRoundTrips}%`);
   }
 
   Logger.prototype.handleRoundtrip = function(rt) {

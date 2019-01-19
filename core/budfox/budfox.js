@@ -30,24 +30,6 @@ var BudFox = function(config) {
 
   //    BudFox data flow:
 
-  // relay a marketUpdate event
-  this.marketDataProvider.on(
-    'marketUpdate',
-    e => this.emit('marketUpdate', e)
-  );
-
-  // relay a marketStart event
-  this.marketDataProvider.on(
-    'marketStart',
-    e => this.emit('marketStart', e)
-  );
-
-  // Output the candles
-  this.candleManager.on(
-    'candles',
-    this.pushCandles
-  );
-
   // on every `tick` retrieve trade data
   this.heart.on(
     'tick',
@@ -60,7 +42,26 @@ var BudFox = function(config) {
     this.candleManager.processTrades
   );
 
+  // Output the candles
+  this.candleManager.on(
+    'candles',
+    this.pushCandles
+  );
+
   this.heart.pump();
+
+  //    Budfox also reports:
+
+  // Trades & last trade
+  //
+  // this.marketDataProvider.on(
+  //   'trades',
+  //   this.broadcast('trades')
+  // );
+  // this.marketDataProvider.on(
+  //   'trades',
+  //   this.broadcastTrade
+  // );
 }
 
 var Readable = require('stream').Readable;
@@ -74,5 +75,19 @@ BudFox.prototype._read = function noop() {}
 BudFox.prototype.pushCandles = function(candles) {
   _.each(candles, this.push);
 }
+
+// BudFox.prototype.broadcastTrade = function(trades) {
+//   _.defer(function() {
+//     this.emit('trade', trades.last);
+//   }.bind(this));
+// }
+
+// BudFox.prototype.broadcast = function(message) {
+//   return function(payload) {
+//     _.defer(function() {
+//       this.emit(message, payload);
+//     }.bind(this));
+//   }.bind(this);
+// }
 
 module.exports = BudFox;

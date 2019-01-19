@@ -19,6 +19,7 @@ module.exports = (mode, config, callback) => {
   };
 
   child.on('message', function(m) {
+
     if(m === 'ready')
       return child.send(message);
 

@@ -1,8 +1,8 @@
 enabled = true
 
-candleSize = 60
+candleSize = 120
 historySize = 25
-method = "MACD"
+method = "RSI"
 
 [talib]
 enabled = false

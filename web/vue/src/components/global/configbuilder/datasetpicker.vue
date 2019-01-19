@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
 div
   h3 Select a dataset
   .txt--center.my2(v-if='datasetScanstate === "idle"')

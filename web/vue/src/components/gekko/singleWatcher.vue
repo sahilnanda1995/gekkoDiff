@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
   div.my2
     .contain(v-if='!data')
       h1 Unknown Watcher

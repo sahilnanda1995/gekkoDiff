@@ -16,7 +16,7 @@ var silent = config.silent;
 
 var sendToParent = function() {
   var send = method => (...args) => {
-    process.send({log: method, message: args.join(' ')});
+    process.send({'log': args.join(' ')});
   }
 
   return {

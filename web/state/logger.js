@@ -1,11 +1,13 @@
 const fs = require('fs');
+const moment = require('moment');
 const _ = require('lodash');
 
 const BASEPATH = __dirname + '/../../logs/';
 
-const Logger = function(id) {
+const Logger = function(type) {
 
-  this.fileName = `${id}.log`;
+  const now = moment().utc().format('YYYY-MM-DD-HH-mm');
+  this.fileName = `${now}-UTC-${type}.log`;
 
   this.writing = false;
   this.queue = [];

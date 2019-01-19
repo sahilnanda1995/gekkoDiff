@@ -1,6 +1,6 @@
 // http://stackoverflow.com/questions/7190898/progress-bar-with-html-and-css
 
-<template lang='pug'>
+<template lang='jade'>
 .progressbarWrapper(v-if='progress')
   p <strong>{{ round(progress) }}%</strong>
   .progressbar

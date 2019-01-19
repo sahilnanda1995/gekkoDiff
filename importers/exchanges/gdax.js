@@ -1,3 +1,4 @@
+const Gdax = require('gdax');
 const util = require('../../core/util.js');
 const _ = require('lodash');
 const moment = require('moment');
@@ -12,13 +13,12 @@ const BATCH_SIZE = 100;
 const SCAN_ITER_SIZE = 50000;
 const BATCH_ITER_SIZE = BATCH_SIZE * 10;
 
-const Fetcher = require(dirs.exchanges + 'gdax');
-const retry = require(dirs.exchanges + '../exchangeUtils').retry;
+let Fetcher = require(dirs.exchanges + 'gdax');
 
 Fetcher.prototype.getTrades = function(sinceTid, callback) {
   let lastScan = 0;
 
-  const handle = (err, data) => {
+  let process = function(err, data) {
     if (err) return callback(err);
 
     let result = _.map(data, function(trade) {
@@ -33,8 +33,8 @@ Fetcher.prototype.getTrades = function(sinceTid, callback) {
     callback(null, result.reverse());
   };
 
-  const fetch = cb => this.gdax_public.getProductTrades(this.pair, { after: sinceTid, limit: BATCH_SIZE }, this.processResponse('getTrades', cb));
-  retry(null, fetch, handle);
+  let handler = (cb) => this.gdax_public.getProductTrades({ after: sinceTid, limit: BATCH_SIZE }, this.handleResponse('getTrades', cb));
+  util.retryCustom(retryForever, _.bind(handler, this), _.bind(process, this));
 };
 
 Fetcher.prototype.findFirstTrade = function(sinceTs, callback) {
@@ -43,7 +43,7 @@ Fetcher.prototype.findFirstTrade = function(sinceTs, callback) {
 
   log.info(`Scanning for the first trade ID to start batching requests, may take a few minutes ...`);
 
-  const handle = (err, data) => {
+  let process = function(err, data) {
     if (err) return callback(err);
 
     let m = moment.utc(_.first(data).time);
@@ -64,13 +64,13 @@ Fetcher.prototype.findFirstTrade = function(sinceTs, callback) {
     }
 
     setTimeout(() => {
-      const fetch = cb => this.gdax_public.getProductTrades(this.pair, { after: nextScanId, limit: 1 }, this.processResponse('getTrades', cb));
-      retry(null, fetch, handle);
+      let handler = (cb) => this.gdax_public.getProductTrades({ after: nextScanId, limit: 1 }, this.handleResponse('getTrades', cb));
+      util.retryCustom(retryForever, _.bind(handler, this), _.bind(process, this));
     }, QUERY_DELAY);
   }
 
-  const fetch = cb => this.gdax_public.getProductTrades(this.pair, { limit: 1 }, this.processResponse('getTrades', cb));
-  retry(null, fetch, handle);
+  let handler = (cb) => this.gdax_public.getProductTrades({ limit: 1 }, this.handleResponse('getTrades', cb));
+  util.retryCustom(retryForever, _.bind(handler, this), _.bind(process, this));
 }
 
 util.makeEventEmitter(Fetcher);

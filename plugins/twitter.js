@@ -14,16 +14,15 @@ var Twitter = function(done) {
     this.price = 'N/A';
     this.done = done;
     this.setup();
-
 };
 
 Twitter.prototype.setup = function(done){
     var setupTwitter = function (err, result) {
         this.client = new TwitterApi({
-          consumer_key: twitterConfig.consumer_key,
-          consumer_secret: twitterConfig.consumer_secret,
-          access_token_key: twitterConfig.access_token_key,
-          access_token_secret: twitterConfig.access_token_secret
+          consumer_key: config.consumer_key,
+          consumer_secret: config.consumer_secret,
+          access_token_key: config.access_token_key,
+          access_token_secret: config.access_token_secret
         });
       
         if(twitterConfig.sendMessageOnStart){
@@ -53,7 +52,7 @@ Twitter.prototype.processCandle = function(candle, done) {
 Twitter.prototype.processAdvice = function(advice) {
 	if (advice.recommendation == "soft" && twitterConfig.muteSoft) return;
 	var text = [
-        'New  ', config.watch.asset, ' trend. Attempting to ',
+        'New #ethereum trend. Attempting to ',
         advice.recommendation == "short" ? "sell" : "buy",
         ' @',
         this.price,
@@ -66,9 +65,9 @@ Twitter.prototype.mail = function(content, done) {
     log.info("trying to tweet");
     this.client.post('statuses/update', {status: content},  function(error, tweet, response) {
       if(error || !response) {
-          log.error('Twitter ERROR:', error)
+          log.error('Pushbullet ERROR:', error)
       } else if(response && response.active){
-          log.info('Twitter Message Sent')
+          log.info('Pushbullet Message Sent')
       }
     }); 
 };
@@ -79,6 +78,5 @@ Twitter.prototype.checkResults = function(err) {
     else
         log.info('Send advice via email.');
 };
-
 
 module.exports = Twitter;

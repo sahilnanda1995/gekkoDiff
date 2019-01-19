@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
 .grd-row-col-3-6
   table.p1
     tr

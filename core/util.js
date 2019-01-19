@@ -4,6 +4,8 @@ var path = require('path');
 var fs = require('fs');
 var semver = require('semver');
 var program = require('commander');
+var retry = require('retry');
+var Errors = require('./error');
 
 var startTime = moment();
 
@@ -14,6 +16,19 @@ var _gekkoMode = false;
 var _gekkoEnv = false;
 
 var _args = false;
+
+var retryHelper = function(fn, options, callback) {
+  var operation = retry.operation(options);
+  operation.attempt(function(currentAttempt) {
+    fn(function(err, result) {
+      if (!(err instanceof Errors.AbortError) && operation.retry(err)) {
+        return;
+      }
+
+      callback(err ? err.message : null, result);
+    });
+  });
+}
 
 // helper functions
 var util = {
@@ -78,18 +93,16 @@ var util = {
     + `\nNodejs version: ${process.version}`;
   },
   die: function(m, soft) {
-
-    if(_gekkoEnv === 'child-process') {
-      return process.send({type: 'error', error: '\n ERROR: ' + m + '\n'});
-    }
-
-    var log = console.log.bind(console);
+    if(_gekkoEnv === 'standalone' || !_gekkoEnv)
+      var log = console.log.bind(console);
+    else if(_gekkoEnv === 'child-process')
+      var log = m => process.send({type: 'error', error: m});
 
     if(m) {
       if(soft) {
         log('\n ERROR: ' + m + '\n\n');
       } else {
-        log(`\nGekko encountered an error and can\'t continue`);
+        log('\n\nGekko encountered an error and can\'t continue');
         log('\nError:\n');
         log(m, '\n\n');
         log('\nMeta debug info:\n');
@@ -106,7 +119,7 @@ var util = {
       gekko: ROOT,
       core: ROOT + 'core/',
       markets: ROOT + 'core/markets/',
-      exchanges: ROOT + 'exchange/wrappers/',
+      exchanges: ROOT + 'exchanges/',
       plugins: ROOT + 'plugins/',
       methods: ROOT + 'strategies/',
       indicators: ROOT + 'strategies/indicators/',
@@ -115,8 +128,7 @@ var util = {
       tools: ROOT + 'core/tools/',
       workers: ROOT + 'core/workers/',
       web: ROOT + 'web/',
-      config: ROOT + 'config/',
-      broker: ROOT + 'exchange/'
+      config: ROOT + 'config/'
     }
   },
   inherit: function(dest, source) {
@@ -163,6 +175,19 @@ var util = {
   },
   getStartTime: function() {
     return startTime;
+  },
+  retry: function(fn, callback) {
+    var options = {
+      retries: 5,
+      factor: 1.2,
+      minTimeout: 1 * 1000,
+      maxTimeout: 3 * 1000
+    };
+
+    retryHelper(fn, options, callback);
+  },
+  retryCustom: function(options, fn, callback) {
+    retryHelper(fn, options, callback);
   },
 }
 

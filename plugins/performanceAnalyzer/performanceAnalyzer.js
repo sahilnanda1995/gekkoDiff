@@ -1,17 +1,20 @@
-
 const _ = require('lodash');
 const moment = require('moment');
 
-const statslite = require('stats-lite');
+const stats = require('../../core/stats');
 const util = require('../../core/util');
-const log = require(util.dirs().core + 'log')
 const ENV = util.gekkoEnv();
-
+var log = require('../../core/log.js');
 const config = util.getConfig();
 const perfConfig = config.performanceAnalyzer;
 const watchConfig = config.watch;
 
-const Logger = require('./logger');
+// Load the proper module that handles the results
+var Handler;
+if(ENV === 'child-process')
+  Handler = require('./cpRelay');
+else
+  Handler = require('./logger');
 
 const PerformanceAnalyzer = function() {
   _.bindAll(this);
@@ -27,56 +30,23 @@ const PerformanceAnalyzer = function() {
   this.currency = watchConfig.currency;
   this.asset = watchConfig.asset;
 
-  this.logger = new Logger(watchConfig);
+  this.handler = new Handler(watchConfig);
 
   this.trades = 0;
 
-  this.exposure = 0;
+  this.sharpe = 0;
 
   this.roundTrips = [];
-  this.losses = [];
   this.roundTrip = {
     id: 0,
     entry: false,
     exit: false
   }
-
-  this.portfolio = {};
-  this.balance;
-
-  this.start = {};
-  this.openRoundTrip = false;
-
-  this.warmupCompleted = false;
-}
-
-PerformanceAnalyzer.prototype.processPortfolioValueChange = function(event) {
-  if(!this.start.balance) {
-    this.start.balance = event.balance;
-  }
-
-  this.balance = event.balance;
-}
-
-PerformanceAnalyzer.prototype.processPortfolioChange = function(event) {
-  if(!this.start.portfolio) {
-    this.start.portfolio = event;
-  }
-}
-
-PerformanceAnalyzer.prototype.processStratWarmupCompleted = function() {
-  this.warmupCompleted = true;
-  this.processCandle(this.warmupCandle, _.noop);
 }
 
 PerformanceAnalyzer.prototype.processCandle = function(candle, done) {
-  if(!this.warmupCompleted) {
-    this.warmupCandle = candle;
-    return done();
-  }
-
   this.price = candle.close;
-  this.dates.end = candle.start.clone().add(1, 'minute');
+  this.dates.end = candle.start;
 
   if(!this.dates.start) {
     this.dates.start = candle.start;
@@ -85,69 +55,73 @@ PerformanceAnalyzer.prototype.processCandle = function(candle, done) {
 
   this.endPrice = candle.close;
 
-  if(this.openRoundTrip) {
-    this.emitRoundtripUpdate();
-  }
-
   done();
 }
 
-PerformanceAnalyzer.prototype.emitRoundtripUpdate = function() {
-  const uPnl = this.price - this.roundTrip.entry.price;
-
-  this.deferredEmit('roundtripUpdate', {
-    at: this.dates.end,
-    duration: this.dates.end.diff(this.roundTrip.entry.date),
-    uPnl,
-    uProfit: uPnl / this.roundTrip.entry.total * 100
-  })
+PerformanceAnalyzer.prototype.processPortfolioUpdate = function(portfolio) {
+  this.start = portfolio;
+  this.current = _.clone(portfolio);
 }
 
-PerformanceAnalyzer.prototype.processTradeCompleted = function(trade) {
+PerformanceAnalyzer.prototype.processTrade = function(trade) {
   this.trades++;
-  this.portfolio = trade.portfolio;
-  this.balance = trade.balance;
-
-  this.registerRoundtripPart(trade);
+  this.current = trade.portfolio;
 
   const report = this.calculateReportStatistics();
-  if(report) {
-    this.logger.handleTrade(trade, report);
-    this.deferredEmit('performanceReport', report);
-  }
+  this.handler.handleTrade(trade, report);
+
+  this.logRoundtripPart(trade);
 }
 
-PerformanceAnalyzer.prototype.registerRoundtripPart = function(trade) {
-  if(this.trades === 1 && trade.action === 'sell') {
-    // this is not part of a valid roundtrip
-    return;
-  }
-
+PerformanceAnalyzer.prototype.logRoundtripPart = function(trade) {
   if(trade.action === 'buy') {
-    if (this.roundTrip.exit) {
-      this.roundTrip.id++;
-      this.roundTrip.exit = false
+    if(this.roundTrip.entry) {
+        this.roundTrip.exit = {
+         date: trade.date,
+         price: trade.price,
+         total: trade.portfolio.currency + (trade.portfolio.asset * trade.price),
+        }
+        this.handleRoundtrip();
     }
-
     this.roundTrip.entry = {
       date: trade.date,
       price: trade.price,
       total: trade.portfolio.currency + (trade.portfolio.asset * trade.price),
     }
-    this.openRoundTrip = true;
-  } else if(trade.action === 'sell') {
+  } 
+  else if(trade.action === 'sell') {
+    if(this.roundTrip.entry) {
+        this.roundTrip.exit = {
+         date: trade.date,
+         price: trade.price,
+         total: trade.portfolio.currency + (trade.portfolio.asset * trade.price),
+        }
+        this.handleRoundtrip();
+    }
+    this.roundTrip.exit = false
+    this.roundTrip.entry = {
+      date: trade.date,
+      price: trade.price,
+      total: trade.portfolio.currency + (trade.portfolio.asset * trade.price),
+    }
+  } 
+  else if(trade.action === 'close') {
     this.roundTrip.exit = {
       date: trade.date,
       price: trade.price,
       total: trade.portfolio.currency + (trade.portfolio.asset * trade.price),
     }
-    this.openRoundTrip = false;
-
-    this.handleCompletedRoundtrip();
+    this.handleRoundtrip();
+    this.roundTrip.entry = false;
   }
+
 }
 
-PerformanceAnalyzer.prototype.handleCompletedRoundtrip = function() {
+PerformanceAnalyzer.prototype.round = function(amount) {
+  return amount.toFixed(8);
+}
+
+PerformanceAnalyzer.prototype.handleRoundtrip = function() {
   var roundtrip = {
     id: this.roundTrip.id,
 
@@ -165,85 +139,65 @@ PerformanceAnalyzer.prototype.handleCompletedRoundtrip = function() {
   roundtrip.pnl = roundtrip.exitBalance - roundtrip.entryBalance;
   roundtrip.profit = (100 * roundtrip.exitBalance / roundtrip.entryBalance) - 100;
 
+  log.debug("PNL", roundtrip.profit)
+
   this.roundTrips[this.roundTrip.id] = roundtrip;
 
-  this.logger.handleRoundtrip(roundtrip);
+  // this will keep resending roundtrips, that is not ideal.. what do we do about it?
+  this.handler.handleRoundtrip(roundtrip);
 
-  this.deferredEmit('roundtrip', roundtrip);
+  // we need a cache for sharpe
 
-  // update cached exposure
-  this.exposure = this.exposure + Date.parse(this.roundTrip.exit.date) - Date.parse(this.roundTrip.entry.date);
-  // track losses separately for downside report
-  if (roundtrip.exitBalance < roundtrip.entryBalance)
-    this.losses.push(roundtrip);
-
+  // every time we have a new roundtrip
+  // update the cached sharpe ratio
+  this.sharpe = stats.sharpe(
+    this.roundTrips.map(r => r.profit),
+    perfConfig.riskFreeReturn
+  );
 }
 
 PerformanceAnalyzer.prototype.calculateReportStatistics = function() {
-  if(!this.start.balance || !this.start.portfolio) {
-    log.error('Cannot calculate a profit report without having received portfolio data.');
-    log.error('Skipping performanceReport..');
-    return false;
-  }
-
   // the portfolio's balance is measured in {currency}
-  const profit = this.balance - this.start.balance;
-
-  const timespan = moment.duration(
+  let balance = this.current.currency + this.price * this.current.asset;
+  let profit = balance - this.start.balance;
+  
+  let timespan = moment.duration(
     this.dates.end.diff(this.dates.start)
   );
-  const relativeProfit = this.balance / this.start.balance * 100 - 100;
-  const relativeYearlyProfit = relativeProfit / timespan.asYears();
+  let relativeProfit = balance / this.start.balance * 100 - 100
 
-  const percentExposure = this.exposure / (Date.parse(this.dates.end) - Date.parse(this.dates.start));
+  let report = {
+    currency: this.currency,
+    asset: this.asset,
 
-  const sharpe = (relativeYearlyProfit - perfConfig.riskFreeReturn)
-    / statslite.stdev(this.roundTrips.map(r => r.profit))
-    / Math.sqrt(this.trades / (this.trades - 2));
-
-  const downside = statslite.percentile(this.losses.map(r => r.profit), 0.25)
-    * Math.sqrt(this.trades / (this.trades - 2));
-
-  const ratioRoundTrips = this.roundTrips.length > 0 ? (this.roundTrips.filter(roundTrip => roundTrip.pnl > 0 ).length / this.roundTrips.length * 100).toFixed(4) : 100;
-
-  const report = {
     startTime: this.dates.start.utc().format('YYYY-MM-DD HH:mm:ss'),
     endTime: this.dates.end.utc().format('YYYY-MM-DD HH:mm:ss'),
     timespan: timespan.humanize(),
     market: this.endPrice * 100 / this.startPrice - 100,
 
-    balance: this.balance,
-    profit,
+    balance: balance,
+    profit: profit,
     relativeProfit: relativeProfit,
 
-    yearlyProfit: profit / timespan.asYears(),
-    relativeYearlyProfit,
+    yearlyProfit: this.round(profit / timespan.asYears()),
+    relativeYearlyProfit: this.round(relativeProfit / timespan.asYears()),
 
     startPrice: this.startPrice,
     endPrice: this.endPrice,
     trades: this.trades,
     startBalance: this.start.balance,
-    exposure: percentExposure,
-    sharpe,
-    downside,
-    ratioRoundTrips
+    sharpe: this.sharpe
   }
 
-  report.alpha = report.relativeProfit - report.market;
+  report.alpha = report.profit - report.market;
 
   return report;
 }
 
 PerformanceAnalyzer.prototype.finalize = function(done) {
-  if(!this.trades) {
-    return done();
-  }
-
   const report = this.calculateReportStatistics();
-  if(report) {
-    this.logger.finalize(report);
-    this.emit('performanceReport', report);
-  }
+  log.debug("Total Profit", report);
+  this.handler.finalize(report);
   done();
 }
 

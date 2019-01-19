@@ -1,17 +1,17 @@
-const util = require('../../core/util.js');
-const _ = require('lodash');
-const moment = require('moment');
-const log = require('../../core/log');
-const retry = require('../../exchange/exchangeUtils').retry;
+var Poloniex = require("poloniex.js");
+var util = require('../../core/util.js');
+var _ = require('lodash');
+var moment = require('moment');
+var log = require('../../core/log');
 
-const config = util.getConfig();
+var config = util.getConfig();
 
-const dirs = util.dirs();
+var dirs = util.dirs();
 
-const Fetcher = require(dirs.exchanges + 'poloniex');
+var Fetcher = require(dirs.exchanges + 'poloniex');
 
-const batchSize = 60 * 2; // 2 hour
-const overlapSize = 10; // 10 minutes
+var batchSize = 60 * 2; // 2 hour
+var overlapSize = 10; // 10 minutes
 
 // Helper methods
 function joinCurrencies(currencyA, currencyB){
@@ -20,10 +20,10 @@ function joinCurrencies(currencyA, currencyB){
 
 // patch getTrades..
 Fetcher.prototype.getTrades = function(range, callback) {
-  const handle = (err, result) => {
-    if(err) {
-      return callback(err);
-    }
+  var args = _.toArray(arguments);
+  var process = function(err, result) {
+    if(err || result.error)
+      return this.retry(this.getTrades, args);
 
     if(_.size(result) === 50000) {
       // to many trades..
@@ -40,17 +40,16 @@ Fetcher.prototype.getTrades = function(range, callback) {
     });
 
     callback(result.reverse());
-  };
+  }.bind(this);
 
-  const params = {
+  var params = {
     currencyPair: joinCurrencies(this.currency, this.asset)
   }
 
   params.start = range.from.unix();
   params.end = range.to.unix();
 
-  const fetch = next => this.poloniex._public('returnTradeHistory', params, this.processResponse(next));
-  retry(null, fetch, handle);
+  this.poloniex._public('returnTradeHistory', params, process);
 }
 
 util.makeEventEmitter(Fetcher);

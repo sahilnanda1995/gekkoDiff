@@ -3,10 +3,6 @@ import store from '../../'
 import { bus } from '../../../components/global/ws'
 
 const transformMarkets = backendData => {
-  if(!backendData) {
-    return {};
-  }
-
   var exchangesRaw = backendData;
   var exchangesTemp = {};
 

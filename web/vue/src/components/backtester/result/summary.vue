@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
 div.contain
 
   .grd-row.summary

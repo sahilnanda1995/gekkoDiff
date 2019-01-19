@@ -4,15 +4,14 @@ const _ = require('lodash');
 const moment = require('moment');
 const log = require('../../core/log');
 
-const config = util.getConfig();
+var config = util.getConfig();
 
-const dirs = util.dirs();
+var dirs = util.dirs();
 
-const Fetcher = require(dirs.exchanges + 'bitfinex');
-const retry = require(dirs.exchanges + '../exchangeUtils').retry;
+var Fetcher = require(dirs.exchanges + 'bitfinex');
 
 Fetcher.prototype.getTrades = function(upto, callback, descending) {
-  const handle = (err, data) => {
+  let process = (err, data) => {
     if (err) return callback(err);
 
     var trades = [];
@@ -22,7 +21,7 @@ Fetcher.prototype.getTrades = function(upto, callback, descending) {
           tid: trade.ID,
           date: moment(trade.MTS).format('X'),
           price: +trade.PRICE,
-          amount: +Math.abs(trade.AMOUNT),
+          amount: +trade.AMOUNT,
         };
       });
     }
@@ -37,9 +36,9 @@ Fetcher.prototype.getTrades = function(upto, callback, descending) {
     path += `?limit=1000&start=${start}&end=${end}`;
   }
 
-  log.debug('Querying trades with: ' + path);
-  const fetch = cb => this.bitfinex.makePublicRequest(path, this.handleResponse('getTrades', cb));
-  retry(null, fetch, handle);
+  console.log('Querying trades with: ' + path);
+  let handler = cb => this.bitfinex.makePublicRequest(path, this.handleResponse('getTrades', cb));
+  util.retryCustom(retryCritical, _.bind(handler, this), _.bind(process, this));
 };
 
 util.makeEventEmitter(Fetcher);
@@ -62,7 +61,6 @@ var stride = ITERATING_STRIDE;
 
 var fetcher = new Fetcher(config.watch);
 fetcher.bitfinex = new Bitfinex(null, null, { version: 2, transform: true }).rest;
-
 var retryCritical = {
   retries: 10,
   factor: 1.2,
@@ -76,16 +74,14 @@ var fetch = () => {
   if (lastTimestamp) {
     // We need to slow this down to prevent hitting the rate limits
     setTimeout(() => {
-
-      // make sure we fetch with overlap from last batch
-      const since = lastTimestamp - 1000;
-      fetcher.getTrades(since, handleFetch);
-    }, 2500);
+      console.log("getTrades() ", lastTimestamp);
+      fetcher.getTrades(lastTimestamp, handleFetch);
+    }, 1800);
   } else {
+    console.log("getTrades() ");
     lastTimestamp = from.valueOf();
     batch_start = moment(from);
     batch_end = moment(from).add(stride, 'h');
-
     fetcher.getTrades(batch_end, handleFetch);
   }
 };

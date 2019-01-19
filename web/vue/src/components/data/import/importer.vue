@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
   div.contain.my2
     div.text(v-html='intro')
     .hr

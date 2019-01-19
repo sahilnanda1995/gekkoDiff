@@ -14,7 +14,6 @@
 //    allowed to run. Realtime is during a live market watch and
 //    backtest is during a backtest.
 //
-//
 //  Optional parameters per plugin.
 //
 // description: text describing the plugin.
@@ -23,8 +22,6 @@
 // emits: events emitted by this plugin that other plugins can subscribe to.
 // path: fn that returns path of file of the plugin (overwrites `gekko/plugins/{slug}`)
 //    when given the configuration object (relative from `gekko/plugins/`).
-// greedy: if this plugin wants to subscribe to a lot of events, but can function
-//    properly when some events wont be emitted.
 var plugins = [
   {
     name: 'Candle writer',
@@ -41,7 +38,7 @@ var plugins = [
     slug: 'tradingAdvisor',
     async: true,
     modes: ['realtime', 'backtest'],
-    emits: true,
+    emits: ['advice'],
     path: config => 'tradingAdvisor/tradingAdvisor.js',
   },
   {
@@ -128,7 +125,7 @@ var plugins = [
     slug: 'trader',
     async: true,
     modes: ['realtime'],
-    emits: true,
+    emits: ['portfolioUpdate', 'trade'],
     path: config => 'trader/trader.js',
   },
   {
@@ -137,7 +134,7 @@ var plugins = [
     slug: 'paperTrader',
     async: false,
     modes: ['realtime', 'backtest'],
-    emits: true,
+    emits: ['portfolioUpdate', 'trade'],
     path: config => 'paperTrader/paperTrader.js',
   },
   {
@@ -146,7 +143,6 @@ var plugins = [
     slug: 'performanceAnalyzer',
     async: false,
     modes: ['realtime', 'backtest'],
-    emits: true,
     path: config => 'performanceAnalyzer/performanceAnalyzer.js',
   },
   {
@@ -165,11 +161,7 @@ var plugins = [
     description: 'Sends advice to pushbullet.',
     slug: 'pushbullet',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: 'pushbullet',
-      version: '1.4.3'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'Kodi',
@@ -183,22 +175,14 @@ var plugins = [
     description: 'Sends trades to twitter.',
     slug: 'twitter',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: 'twitter',
-      version: '1.7.1'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'Slack',
     description: 'Sends trades to slack channel.',
     slug: 'slack',
     async: false,
-    modes: ['realtime'],
-    dependencies: [{
-      module: '@slack/client',
-      version: '3.13.0'
-    }]
+    modes: ['realtime']
   },
   {
     name: 'IFTTT',
@@ -206,41 +190,7 @@ var plugins = [
     slug: 'ifttt',
     async: false,
     modes: ['realtime']
-  },
-  {
-    name: 'Event logger',
-    description: 'Logs all gekko events.',
-    slug: 'eventLogger',
-    async: false,
-    modes: ['realtime', 'backtest'],
-    greedy: true
-  },
-  {
-    name: 'Backtest result export',
-    description: 'Exports the results of a gekko backtest',
-    slug: 'backtestResultExporter',
-    async: false,
-    modes: ['backtest']
-  },
-  {
-    name: 'Child to parent',
-    description: 'Relays events from the child to the parent process',
-    slug: 'childToParent',
-    async: false,
-    modes: ['realtime'],
-    greedy: true
-  },
-  {
-    name: 'Candle Uploader',
-    description: 'Upload realtime market candles to an external server',
-    slug: 'candleUploader',
-    async: true,
-    modes: ['realtime'],
-    dependencies: [{
-      module: 'axios',
-      version: '0.18.0'
-    }]
-  },
+  }
 ];
 
 module.exports = plugins;

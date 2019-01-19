@@ -1,4 +1,4 @@
-<template lang='pug'>
+<template lang='jade'>
   div(v-if='active')
     #modal-background
     #modal.modal
@@ -17,8 +17,6 @@ const messages = {
 Something happened to either Gekko or the connection.
 Please check the terminal where Gekko is running or
 your network connection.
-
-*This message is shown when the UI is unable to open a websocket connection with the Gekko Server.*
 
   `)
 }
